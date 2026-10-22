@@ -27,6 +27,12 @@ from video_compatibility import video_compatibility, CompatibilityError, Compati
 logging.basicConfig(level=logging.WARNING)
 log = logging.getLogger(__name__)
 app = Flask(__name__)
+# Em executável (PyInstaller), interface vive no diretório extraído.
+if getattr(sys, 'frozen', False):
+    base = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+    app = Flask(__name__,
+                template_folder=os.path.join(base, 'templates'),
+                static_folder=os.path.join(base, 'static'))
 app.config['TVHUB_PORT'] = int(os.environ.get('TVHUB_PORT', '8080'))
 atexit.register(chat_service.close)
 atexit.register(video_compatibility.close)
@@ -447,6 +453,9 @@ def api_iptv_list():
 
 # ─── Twitch ───────────────────────────────────────────────────
 def _twitch_streamlink(ch):
+    # No executável não há streamlink externo; a API GQL cobre esta função.
+    if getattr(sys, 'frozen', False):
+        return None, None
     try:
         r = subprocess.run(
             [sys.executable, "-m", "streamlink", "--stream-url",
@@ -643,7 +652,8 @@ if __name__ == "__main__":
     print("  Acesse na TV: http://{}:{}/?tv=1&remote=1".format(host_ip, server_port))
     print("=" * 55 + "\n")
 
-    if os.environ.get('TVHUB_OPEN_BROWSER') == '1':
+    open_browser = os.environ.get('TVHUB_OPEN_BROWSER')
+    if open_browser == '1' or (open_browser is None and getattr(sys, 'frozen', False)):
         def open_browser_when_ready():
             import webbrowser
             address = 'http://localhost:{}/'.format(server_port)

@@ -101,6 +101,15 @@ uv pip install --python .venv\Scripts\python.exe -r requirements.txt
 
 Edite `CHANNELS` em `app.py` para alterar os canais iniciais. Também é possível abrir qualquer canal válido pela busca e adicioná-lo aos favoritos.
 
+## Executáveis (releases)
+
+Cada versão marcada com tag (ex.: `v1.0.0`) é compilada automaticamente pelo Actions em executáveis únicos, publicados na aba Releases:
+
+- `TVHub-windows-x64.exe` — Windows x64
+- `TVHub-linux-x64` — Linux x64
+
+Não é preciso instalar Python: baixe, execute e abra o endereço na TV. O FFmpeg continua consultado no `PATH` para capturas e adaptação de vídeo; sem ele, os demais recursos funcionam. Para mudar a porta, defina `TVHUB_PORT=8081` antes de iniciar (no PowerShell: `$env:TVHUB_PORT='8081'; .\TVHub-windows-x64.exe`).
+
 ## Compatibilidade e reprodução
 
 - JavaScript ES5 e XMLHttpRequest: sem `fetch`, arrow functions, módulos ou dependência de um framework no navegador.

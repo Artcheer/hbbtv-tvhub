@@ -1,0 +1,29 @@
+# Ambiente
+.venv/
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Testes
+tests/results/
+.pytest_cache/
+
+# Variáveis de ambiente e chaves (prevenção)
+.env
+.env.*
+*.env
+
+# Registros
+*.log
+
+# Sistema operacional
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editores
+.vscode/
+.idea/

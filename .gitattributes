@@ -1,0 +1,5 @@
+# Normaliza quebras de linha no repositório
+* text=auto
+
+# Arquivos que precisam preservar CRLF
+*.bat text eol=crlf

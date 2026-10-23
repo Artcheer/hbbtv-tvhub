@@ -12,6 +12,7 @@ var hub = {
   remote: {enabled: false, focused: null, source: '', lastPoint: null, lastMove: 0, nativeUntil: 0, lockAttempted: false, pointerTimer: null},
   iptv: {kind: 'country', value: 'br', title: 'Brasil', channels: [], total: 0,
          search: '', loaded: false, loading: false, generation: 0, request: null},
+  custom: {channels: [], total: 0, search: '', loaded: false, loading: false, generation: 0, request: null},
   chat: {visible: true, mode: 'tv', cursor: 0, generation: 0, timer: null,
          request: null, seen: {}, ids: [], size: 0, failures: 0},
   storageAvailable: true, keyset: null
@@ -87,42 +88,49 @@ function renderRecent() {
 }
 
 function setView(view) {
-  var names = {home: 'Visão geral', favorites: 'Favoritos', history: 'Vistos recentemente', discover: 'Descobrir', twitch: 'Twitch', kick: 'Kick', iptv: 'Canais de TV'};
+  var names = {home: 'Visão geral', favorites: 'Favoritos', history: 'Vistos recentemente', discover: 'Descobrir', twitch: 'Twitch', kick: 'Kick', iptv: 'Canais de TV', custom: 'Meus canais'};
   if (!names[view]) return;
-  clearTimeout(iptvSearchTimer); cancelPreviews();
+  clearTimeout(iptvSearchTimer); clearTimeout(customSearchTimer); cancelPreviews();
   if (view !== 'discover') stopDiscover();
   hub.view = view; hub.filter = (view === 'twitch' || view === 'kick') ? view : 'all'; hub.visible = 24;
   var buttons = document.querySelectorAll('.nav-button');
   for (var i = 0; i < buttons.length; i++) { var active = buttons[i].id === 'nav-' + view; buttons[i].classList[active ? 'add' : 'remove']('active'); if (active) buttons[i].setAttribute('aria-current', 'page'); else buttons[i].removeAttribute('aria-current'); }
   g('page-title').textContent = names[view]; g('page-title').appendChild(node('span', 'title-dot', '.'));
-  hide('hero', view !== 'home'); hide('platform-filters', view === 'iptv' || view === 'twitch' || view === 'kick' || view === 'discover'); hide('iptv-filters', view !== 'iptv'); hide('discover-toolbar', view !== 'discover'); hide('preview-toggle', view === 'home'); updatePreviewToggle();
+  hide('hero', view !== 'home'); hide('platform-filters', view === 'iptv' || view === 'custom' || view === 'twitch' || view === 'kick' || view === 'discover'); hide('iptv-filters', view !== 'iptv'); hide('custom-filters', view !== 'custom'); hide('discover-toolbar', view !== 'discover'); hide('preview-toggle', view === 'home'); updatePreviewToggle();
   g('library-scroll').scrollTop = 0; updateFilters(); renderRecent();
   if (view === 'discover') { startDiscover(); }
   else if (view === 'iptv' && !hub.iptv.loaded && !hub.iptv.loading) { loadIptvMenu(); loadIptv('country', 'br', 'Brasil'); }
+  else if (view === 'custom' && !hub.custom.loaded && !hub.custom.loading) loadCustom();
   else renderGrid();
 }
 function updateFilters() { var values = ['all', 'twitch', 'kick']; for (var i = 0; i < values.length; i++) { var active = hub.filter === values[i]; g('filter-' + values[i]).classList[active ? 'add' : 'remove']('active'); g('filter-' + values[i]).setAttribute('aria-pressed', active ? 'true' : 'false'); } }
 function setFilter(filter) { hub.filter = filter; hub.visible = 24; updateFilters(); renderGrid(); }
 function currentChannels() {
-  var list = hub.view === 'favorites' ? hub.favorites : hub.view === 'history' ? hub.history : hub.view === 'iptv' ? hub.iptv.channels : hub.view === 'discover' ? hub.discover.channels : hub.channels;
-  if (hub.view === 'iptv' || hub.view === 'discover' || hub.filter === 'all') return list.slice();
+  var list = hub.view === 'favorites' ? hub.favorites : hub.view === 'history' ? hub.history : hub.view === 'iptv' ? hub.iptv.channels : hub.view === 'custom' ? hub.custom.channels : hub.view === 'discover' ? hub.discover.channels : hub.channels;
+  if (hub.view === 'iptv' || hub.view === 'custom' || hub.view === 'discover' || hub.filter === 'all') return list.slice();
   return list.filter(function (channel) { return channel.platform === hub.filter; });
 }
 function initials(name) { var words = name.replace(/[^a-zA-Z0-9À-ÿ ]/g, '').split(/\s+/); return ((words[0] || '?').charAt(0) + (words.length > 1 ? words[1].charAt(0) : (words[0] || '').charAt(1))).toUpperCase(); }
-function emptyState(title, detail, retry) { var root = g('grid'); clear(root); var box = node('div', 'empty-state'); box.appendChild(icon(hub.view === 'favorites' ? 'heart' : 'tv')); box.appendChild(node('h3', '', title)); box.appendChild(node('p', '', detail)); if (retry) box.appendChild(makeButton('Tentar novamente', 'button subtle', retry)); else box.appendChild(makeButton('Abrir um canal', 'button primary', openSearch)); root.appendChild(box); hide('catalog-more', true); }
+function emptyState(title, detail, retry) { var root = g('grid'); clear(root); var box = node('div', 'empty-state'); box.appendChild(icon(hub.view === 'favorites' ? 'heart' : hub.view === 'custom' ? 'link' : 'tv')); box.appendChild(node('h3', '', title)); box.appendChild(node('p', '', detail)); if (retry) box.appendChild(makeButton('Tentar novamente', 'button subtle', retry)); else box.appendChild(makeButton('Abrir um canal', 'button primary', openSearch)); root.appendChild(box); hide('catalog-more', true); }
 function renderGrid() {
   cancelPreviews();
-  var titles = {home: 'Encontre seu próximo play', favorites: 'Seus favoritos, sempre por perto', history: 'O que você assistiu por aqui', twitch: 'Seu universo na Twitch', kick: 'Descubra seu próximo canal na Kick', iptv: hub.iptv.title, discover: hub.discover.language === 'pt' ? 'Em alta em português' : 'Em alta agora'};
+  var titles = {home: 'Encontre seu próximo play', favorites: 'Seus favoritos, sempre por perto', history: 'O que você assistiu por aqui', twitch: 'Seu universo na Twitch', kick: 'Descubra seu próximo canal na Kick', iptv: hub.iptv.title, custom: 'Meus canais', discover: hub.discover.language === 'pt' ? 'Em alta em português' : 'Em alta agora'};
   g('catalog-title').textContent = titles[hub.view];
-  var list = currentChannels(), total = hub.view === 'iptv' ? hub.iptv.total : list.length;
+  var list = currentChannels(), total = hub.view === 'iptv' ? hub.iptv.total : hub.view === 'custom' ? hub.custom.total : list.length;
   g('catalog-subtitle').textContent = hub.view === 'home' ? 'Seus canais em um só lugar. Escolha e aproveite.' : total + (total === 1 ? ' canal' : ' canais') + (hub.view === 'history' ? ' no seu histórico.' : ' para você explorar.');
   if (hub.view === 'discover' && renderDiscoverStatus()) return;
   if (hub.view === 'iptv' && hub.iptv.loading && !list.length) { clear(g('grid')); var loading = node('div', 'empty-state'); loading.appendChild(node('div', 'spinner')); loading.appendChild(node('h3', '', 'Buscando canais...')); g('grid').appendChild(loading); hide('catalog-more', true); return; }
+  if (hub.view === 'custom' && hub.custom.loading && !list.length) { clear(g('grid')); var loadingCustom = node('div', 'empty-state'); loadingCustom.appendChild(node('div', 'spinner')); loadingCustom.appendChild(node('h3', '', 'Abrindo sua lista...')); g('grid').appendChild(loadingCustom); hide('catalog-more', true); return; }
   if (!list.length) {
+    if (hub.view === 'custom') {
+      if (hub.custom.search) emptyState('Nenhum canal com esse nome.', 'Tente outro termo ou veja a lista completa depois de limpar o filtro.', function () { loadCustom(false); });
+      else emptyState('Sua lista ainda não tem canais.', 'Edite o arquivo canais.txt na pasta do TVHub: uma linha por canal, no formato link;nome_do_canal. Depois de salvar, use Recarregar canais.', function () { loadCustom(false); });
+      return;
+    }
     emptyState(hub.view === 'favorites' ? 'Seu próximo favorito está por aí.' : hub.view === 'history' ? 'Sua história começa com um play.' : 'Nenhum canal por aqui.', hub.view === 'favorites' ? 'Toque no coração de um canal para encontrá-lo aqui.' : hub.view === 'history' ? 'Os canais que você assistir vão aparecer neste espaço.' : 'Tente outra plataforma ou uma busca diferente.'); return;
   }
   var root = g('grid'); clear(root);
-  var limit = hub.view === 'iptv' || hub.view === 'discover' ? list.length : Math.min(list.length, hub.visible);
+  var limit = hub.view === 'iptv' || hub.view === 'custom' || hub.view === 'discover' ? list.length : Math.min(list.length, hub.visible);
   for (var i = 0; i < limit; i++) (function (channel) {
     var card = node('article', 'channel-card ' + channel.platform), name = channel.name || channel.slug;
     var watch = makeButton('', 'channel-watch', function () { playChannel(channel); }); watch.setAttribute('aria-label', 'Assistir ' + name + ' · ' + (channel.platform === 'iptv' ? 'TV' : channel.platform)); watch.setAttribute('data-channel-key', channelKey(channel));
@@ -139,7 +147,7 @@ function renderGrid() {
   schedulePreviews();
 }
 function exploreChannels() { focusFirst(g('grid')); }
-function showMore() { if (hub.view === 'discover') loadDiscover(true); else if (hub.view === 'iptv') loadIptv(hub.iptv.kind, hub.iptv.value, hub.iptv.title, true); else { hub.visible += 24; renderGrid(); } }
+function showMore() { if (hub.view === 'discover') loadDiscover(true); else if (hub.view === 'iptv') loadIptv(hub.iptv.kind, hub.iptv.value, hub.iptv.title, true); else if (hub.view === 'custom') loadCustom(true); else { hub.visible += 24; renderGrid(); } }
 
 function loadIptvMenu() {
   getJSON('/api/iptv/menu', function (error, data) {
@@ -173,6 +181,28 @@ function loadIptv(kind, value, title, append, search) {
 }
 var iptvSearchTimer = null;
 function filterIptv(value) { clearTimeout(iptvSearchTimer); ++hub.iptv.generation; if (hub.iptv.request) hub.iptv.request.abort(); iptvSearchTimer = setTimeout(function () { loadIptv(hub.iptv.kind, hub.iptv.value, hub.iptv.title, false, value); }, 350); }
+
+function loadCustom(append, search) {
+  var custom = hub.custom;
+  if (append && custom.loading) return;
+  if (custom.request) custom.request.abort();
+  var generation = ++custom.generation;
+  if (!append) { custom.channels = []; custom.total = 0; custom.search = search !== undefined ? search : ''; g('custom-query').value = custom.search; }
+  custom.loading = true;
+  if (hub.view === 'custom') renderGrid();
+  var url = '/api/custom/list?limit=60&offset=' + (append ? custom.channels.length : 0) + '&search=' + encodeURIComponent(custom.search);
+  custom.request = getJSON(url, function (error, data) {
+    if (generation !== custom.generation) return;
+    custom.loading = false; custom.request = null;
+    if (error || !data || !data.ok) { if (hub.view === 'custom') { if (append) toast(error || 'Não foi possível carregar mais canais.'); else emptyState('A lista está indisponível agora.', error || 'Tente novamente em instantes.', function () { loadCustom(false, custom.search); }); } return; }
+    var channels = data.channels || [], list = [];
+    for (var i = 0; i < channels.length; i++) { channels[i].platform = 'iptv'; var channel = safeChannel(channels[i]); if (channel) list.push(channel); }
+    custom.channels = append ? custom.channels.concat(list) : list; custom.total = data.total; custom.loaded = true;
+    if (hub.view === 'custom') { var oldLength = append ? custom.channels.length - list.length : 0; renderGrid(); if (append) { var watches = g('grid').querySelectorAll('.channel-watch'); if (watches[oldLength]) focusElement(watches[oldLength]); } }
+  }, 35000);
+}
+var customSearchTimer = null;
+function filterCustom(value) { clearTimeout(customSearchTimer); ++hub.custom.generation; if (hub.custom.request) hub.custom.request.abort(); customSearchTimer = setTimeout(function () { loadCustom(false, value); }, 350); }
 
 function openSearch() { hub.lastFocus = document.activeElement; var platform = hub.current ? hub.current.platform : hub.view === 'discover' ? hub.discover.platform : hub.view; setSearchPlatform(platform === 'kick' ? 'kick' : platform === 'iptv' ? 'iptv' : 'twitch'); g('search-input').value = ''; resetChannelSearch(); hide('search-dialog', false); setRemoteKeys(true); focusElement(g('search-input')); }
 function closeSearch() { cancelChannelSearch(); cancelPreviews(); hide('search-dialog', true); setRemoteKeys(false); restoreFocus(); schedulePreviews(); }

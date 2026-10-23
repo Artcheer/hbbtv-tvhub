@@ -154,6 +154,8 @@ select, .iptv-filters input { border: 1px solid #4b3e51; border-radius: 6px; bac
 .iptv-filters input { width: 160px; }
 .iptv-filters .button { margin-right: 14px; margin-bottom: 9px; }
 .iptv-text-label { margin-left: auto; }
+.custom-filters .custom-note { -webkit-flex-basis: 100%; flex-basis: 100%; margin: 4px 0 0; }
+.custom-note strong { color: #ddd0e6; }
 .spinner { border: 3px solid #43364f; border-top-color: #b1f279; border-radius: 50%; width: 36px; height: 36px; margin: 0 auto 20px; -webkit-animation: spin .9s linear infinite; animation: spin .9s linear infinite; }
 @-webkit-keyframes spin { to { -webkit-transform: rotate(360deg); } }
 @keyframes spin { to { transform: rotate(360deg); } }

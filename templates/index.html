@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101015">
   <title>TVHub · Seu lugar para assistir</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/tvhub.css?v=20261018-codec3">
+  <link rel="stylesheet" href="/static/tvhub.css?v=20261022-custom1">
 </head>
 <body>
 <object id="application-manager" type="application/oipfApplicationManager" class="application-manager" aria-hidden="true"></object>
@@ -47,6 +47,7 @@
       <button id="nav-twitch" class="nav-button focusable" onclick="setView('twitch')"><svg class="icon twitch-color"><use xlink:href="#i-twitch"/></svg>Twitch<span class="nav-dot twitch-dot"></span></button>
       <button id="nav-kick" class="nav-button focusable" onclick="setView('kick')"><svg class="icon kick-color"><use xlink:href="#i-kick"/></svg>Kick<span class="nav-dot kick-dot"></span></button>
       <button id="nav-iptv" class="nav-button focusable" onclick="setView('iptv')"><svg class="icon tv-color"><use xlink:href="#i-tv"/></svg>Canais de TV</button>
+      <button id="nav-custom" class="nav-button focusable" onclick="setView('custom')"><svg class="icon tv-color"><use xlink:href="#i-link"/></svg>Meus canais</button>
     </nav>
     <div class="sidebar-bottom">
       <button class="tv-connect focusable" onclick="openConnection()"><svg class="icon"><use xlink:href="#i-tv"/></svg><span>Leve para a sua TV<small>Assista pela rede local</small></span><span class="connect-arrow">↗</span></button>
@@ -71,6 +72,7 @@
         <div class="catalog-heading"><div><h2 id="catalog-title">Encontre seu próximo play</h2><p id="catalog-subtitle">Seus canais em um só lugar. Escolha e aproveite.</p></div><div class="catalog-tools"><div id="platform-filters" class="platform-filters" aria-label="Filtrar plataforma"><button id="filter-all" class="filter-button active focusable" onclick="setFilter('all')">Todos</button><button id="filter-twitch" class="filter-button focusable" onclick="setFilter('twitch')">Twitch</button><button id="filter-kick" class="filter-button focusable" onclick="setFilter('kick')">Kick</button></div><button id="preview-toggle" class="preview-toggle focusable hidden" onclick="togglePreviews()" aria-pressed="true"><svg class="icon"><use xlink:href="#i-tv"/></svg>Miniaturas</button></div></div>
         <section id="discover-toolbar" class="discover-toolbar hidden" aria-label="Filtros de descoberta"><div class="discover-first-row"><div class="discover-platforms"><button id="discover-twitch" class="platform-choice active focusable" onclick="setDiscoverPlatform('twitch')"><svg class="icon twitch-color"><use xlink:href="#i-twitch"/></svg>Twitch</button><button id="discover-kick" class="platform-choice focusable" onclick="setDiscoverPlatform('kick')"><svg class="icon kick-color"><use xlink:href="#i-kick"/></svg>Kick</button></div><label>Idioma<select id="discover-language" class="focusable" onchange="setDiscoverLanguage(this.value)"><option value="pt">Português</option><option value="all">Todos os idiomas</option></select></label><button class="button subtle focusable discover-refresh" onclick="loadDiscover(false)"><svg class="icon"><use xlink:href="#i-refresh"/></svg>Atualizar</button></div><div class="discover-second-row"><label class="discover-category-label">Jogo ou assunto<select id="discover-category" class="focusable" onchange="setDiscoverCategory(this.value)"><option value="">Em alta · todos os assuntos</option></select></label><div class="discover-category-search"><label for="category-query">Procurar outra categoria</label><div><input id="category-query" class="focusable" maxlength="80" placeholder="Ex.: Minecraft, música..."><button id="category-search" class="icon-button focusable" onclick="findCategories()" aria-label="Pesquisar categoria"><svg class="icon"><use xlink:href="#i-search"/></svg></button></div></div></div><p class="preview-note">Prévias estáticas, sem reprodução automática.</p><p id="discover-notice" class="discover-notice" role="status"></p></section>
         <div id="iptv-filters" class="iptv-filters hidden"><label>País<select id="iptv-country" class="focusable" onchange="loadIptv('country',this.value,this.options[this.selectedIndex].text)"><option value="br">Brasil</option></select></label><label>Categoria<select id="iptv-category" class="focusable" onchange="if(this.value)loadIptv('category',this.value,this.options[this.selectedIndex].text)"><option value="">Escolher categoria</option></select></label><button class="button subtle focusable" onclick="loadIptv('all','','Todos os canais')">Todos os canais</button><label class="iptv-text-label">Filtrar lista<input id="iptv-query" class="focusable" type="search" placeholder="Nome do canal..." oninput="filterIptv(this.value)"></label></div>
+        <div id="custom-filters" class="iptv-filters custom-filters hidden"><button class="button subtle focusable" onclick="loadCustom(false)"><svg class="icon"><use xlink:href="#i-refresh"/></svg>Recarregar canais</button><label class="iptv-text-label">Filtrar lista<input id="custom-query" class="focusable" type="search" placeholder="Nome do canal..." oninput="filterCustom(this.value)"></label><p class="preview-note custom-note">Seus canais ficam no arquivo <strong>canais.txt</strong> na pasta do TVHub: uma linha por canal, no formato <strong>link;nome_do_canal</strong>.</p></div>
         <div id="grid" class="channel-grid" aria-live="polite"><div class="empty-state"><div class="spinner"></div><h3>Preparando seus canais...</h3></div></div>
         <div id="catalog-more" class="catalog-more hidden"><span id="catalog-count"></span><button id="more-channels" class="button subtle focusable" onclick="showMore()">Mostrar mais canais</button></div>
       </section>
@@ -113,8 +115,8 @@
 
 <div id="connection-dialog" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="connection-title"><div class="modal-card connection-card"><div class="modal-heading"><h2 id="connection-title">Seu hub na tela grande.</h2><button class="icon-button focusable" onclick="closeConnection()" aria-label="Fechar"><svg class="icon"><use xlink:href="#i-close"/></svg></button></div><div class="connection-icon"><svg class="icon"><use xlink:href="#i-tv"/></svg></div><p>Com a TV na mesma rede deste computador, abra o navegador da TV e digite:</p><div id="server-address" class="server-address">Carregando endereço...</div><p class="connection-note">Mantenha o servidor aberto no computador enquanto assiste.</p><button class="button primary focusable" onclick="closeConnection()">Entendi</button></div></div>
 <div id="toast" class="toast hidden" role="status"></div>
-<script src="/static/explore.js?v=20261018-codec3"></script>
-<script src="/static/remote.js?v=20261018-codec3"></script>
-<script src="/static/tvhub.js?v=20261018-codec3"></script>
+<script src="/static/explore.js?v=20261022-custom1"></script>
+<script src="/static/remote.js?v=20261022-custom1"></script>
+<script src="/static/tvhub.js?v=20261022-custom1"></script>
 </body>
 </html>

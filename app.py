@@ -250,6 +250,88 @@ def _iptv_url(kind, value):
     return None, None
 
 
+# ═════════════════════════════════════════════════════════════
+#  Lista personalizada — aba "Meus canais" (arquivo canais.txt)
+#  Uma linha por canal: link;nome_do_canal
+# ═════════════════════════════════════════════════════════════
+CUSTOM_FILE = 'canais.txt'
+
+_custom_cache = {'mtime': None, 'data': []}
+_custom_lock  = threading.Lock()
+
+_URL_SCHEMES = ('http://', 'https://')
+
+
+def _custom_path():
+    """Arquivo editável pelo usuário; no executável, fica ao lado do TVHub.exe."""
+    if getattr(sys, 'frozen', False):
+        folder = os.path.dirname(sys.executable)
+    else:
+        folder = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(folder, CUSTOM_FILE)
+
+def _custom_parse(text, source):
+    """Interpreta canais.txt: link;nome (logo opcional; aceita nome;link invertido)."""
+    channels, seen = [], set()
+    for number, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        parts = [p.strip() for p in line.split(';') if p.strip()]
+        if parts and parts[0].lower().startswith(_URL_SCHEMES):
+            url, rest = parts[0], parts[1:]
+        elif len(parts) >= 2 and parts[1].lower().startswith(_URL_SCHEMES):
+            url, rest = parts[1], [parts[0]] + parts[2:]
+        else:
+            url, rest = None, parts
+        logo = ''
+        if len(rest) >= 2 and rest[-1].lower().startswith(_URL_SCHEMES):
+            logo, rest = rest[-1], rest[:-1]
+        name = ';'.join(rest).strip()
+        if not url or not name:
+            log.warning("%s linha %d ignorada: %s", source, number, line[:80])
+            continue
+        if len(name) > 200:
+            log.warning("%s linha %d ignorada: nome acima de 200 caracteres.", source, number)
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        channels.append({'name': name, 'group': '', 'logo': logo, 'url': url})
+    return channels
+
+def _custom_channels():
+    """Lê canais.txt quando ele é alterado (mtime) e devolve a lista de canais."""
+    path = _custom_path()
+    try:
+        mtime = os.stat(path).st_mtime_ns
+    except OSError:
+        mtime = None
+    with _custom_lock:
+        if _custom_cache['mtime'] == mtime:
+            return _custom_cache['data']
+        text = None
+        if mtime is not None:
+            try:
+                with open(path, 'rb') as handle:
+                    raw = handle.read()
+            except OSError:
+                log.warning("%s não pode ser lido: %s", CUSTOM_FILE, path)
+            else:
+                for encoding in ('utf-8-sig', 'cp1252'):
+                    try:
+                        text = raw.decode(encoding)
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                if text is None:
+                    text = raw.decode('utf-8', 'replace')
+        data = _custom_parse(text or '', CUSTOM_FILE)
+        _custom_cache['mtime'] = mtime
+        _custom_cache['data'] = data
+        return data
+
+
 # ─── HTML ─────────────────────────────────────────────────────
 # Chrome 47 / SRAF 4.0 — RESPONSIVO
 # Regras: SEM var(), clamp(), aspect-ratio, CSS Grid, backdrop-filter.
@@ -448,6 +530,27 @@ def api_iptv_list():
     channels = [{"name": c["name"], "group": c.get("group", ""),
                  "logo": c.get("logo", ""), "url": c["url"],
                  'thumbnail': previews.tv_url(c['url'], c.get('logo', ''))} for c in limited]
+    return jsonify({"ok": True, "total": len(data), "channels": channels,
+                    'offset': offset, 'has_more': offset + len(channels) < len(data)})
+
+# ─── Lista personalizada (canais.txt) ────────────────────────
+@app.route("/api/custom/list")
+def api_custom_list():
+    try:
+        offset = int(request.args.get('offset', '0'))
+        limit = int(request.args.get('limit', str(IPTV_MAX)))
+        if offset < 0 or limit < 1 or limit > IPTV_MAX:
+            raise ValueError
+    except ValueError:
+        return jsonify({'ok': False, 'error': 'Paginação inválida.'}), 400
+    data = _custom_channels()
+    search = request.args.get('search', '').strip().casefold()[:150]
+    if search:
+        data = [channel for channel in data if search in channel['name'].casefold()]
+    limited = data[offset:offset + limit]
+    channels = [{"name": c["name"], "group": "", "logo": c.get("logo", ""),
+                 "url": c["url"], 'thumbnail': previews.tv_url(c['url'], c.get('logo', ''))}
+                for c in limited]
     return jsonify({"ok": True, "total": len(data), "channels": channels,
                     'offset': offset, 'has_more': offset + len(channels) < len(data)})
 

@@ -34,6 +34,7 @@ Para mudar a porta, defina `TVHUB_PORT` antes de iniciar. O padrão é `8080`.
 - Miniaturas estáticas de Twitch, Kick e TV, carregadas apenas nos itens visíveis. A página inicial continua sem imagens remotas ou consultas de descoberta.
 - Player com chat lateral, pausa, som, tela cheia e seleção de qualidade quando disponível.
 - IPTV por país/categoria, carregamento em páginas de 60 canais e busca em toda a lista selecionada.
+- Aba **Meus canais** com a lista própria do usuário: edite `canais.txt` (uma linha por canal, formato `link;nome_do_canal`) e use **Recarregar canais** — sem reiniciar o servidor.
 - Reconexão dos chats, mensagens de erro compreensíveis e cancelamento de requisições ao sair do player.
 
 ## Controle remoto
@@ -83,6 +84,22 @@ As capturas de TV usam **FFmpeg no computador servidor**, com tempo e número de
 **Chat do site** incorpora a página original da plataforma. É uma opção para navegadores capazes de executar o site atual; o Chrome 47 da TV pode não ser suficiente. Autenticação, cookies e permissões do site continuam sob controle da plataforma. **Abrir chat original** abre a página oficial separadamente para entrar na conta e conversar.
 
 O modo leve é independente da página oficial: o vídeo e o chat da TV não precisam carregar os aplicativos web atuais da Twitch/Kick.
+
+## Meus canais (lista própria)
+
+A aba **Meus canais** mostra uma lista de streams escolhida por você. Os canais ficam no arquivo **`canais.txt`**, na pasta do servidor (em instaladores com o executável, junto do `TVHub.exe`). Uma linha por canal, com o **link primeiro** e o **nome depois**, separados por ponto e vírgula:
+
+```text
+https://servidor.example/stream.m3u8;Canal Aberto HD
+https://servidor.example/live/index.m3u8;Portal do Esporte
+https://servidor.example/stream.m3u8;Meu Canal;https://logo.example/meu-canal.png
+```
+
+- O campo de logotipo (terceiro, opcional) é a URL de uma imagem.
+- Linhas começadas por `#` são anotações e são ignoradas; linhas com erro aparecem no terminal do servidor e são puladas.
+- O servidor relê o arquivo quando ele muda: salve e use **Recarregar canais** na aba, sem reiniciar o app.
+- Nomes e endereços que não estejam em `http://`/`https://` não são aceitos; vídeos MP4 diretos e master `.m3u8` funcionam como os canais da aba Canais de TV, incluindo o proxy e a adaptação de vídeo.
+- "Filtrar lista" busca pelo nome dentro da lista carregada.
 
 ## Instalação em um computador novo
 
@@ -157,6 +174,7 @@ HBBTV/
   media_previews.py         Miniaturas estáticas
   video_compatibility.py    Adaptação de vídeo no computador
   RUN_IPTV.bat              Iniciador do Windows
+  canais.txt                Lista própria de streams (aba Meus canais)
   requirements.txt          Dependências do servidor
   static/                   JavaScript ES5, estilos e ícone
   templates/                Interface HTML

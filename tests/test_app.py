@@ -1,7 +1,10 @@
 import collections
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+import time
 import unittest
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
@@ -137,6 +140,64 @@ class AppTests(unittest.TestCase):
         with patch.object(server.req, 'get', return_value=FakeResponse(status=403)):
             self.assertEqual(self.client.get('/proxy/ts?url=https://media.example/video').status_code, 502)
         self.assertEqual(self.client.get('/proxy/ts?url=file:///etc/passwd').status_code, 400)
+
+
+class CustomListTests(unittest.TestCase):
+    def setUp(self):
+        self.client = server.app.test_client()
+        self.directory = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.directory.name, 'canais.txt')
+        self.original_path, self.original_cache = server._custom_path, dict(server._custom_cache)
+        server._custom_path = lambda: self.path
+        server._custom_cache.update(mtime=None, data=[])
+
+    def tearDown(self):
+        server._custom_path = self.original_path
+        server._custom_cache.update(self.original_cache)
+        self.directory.cleanup()
+
+    def test_missing_file_lists_no_channels(self):
+        result = self.client.get('/api/custom/list').json
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['total'], 0)
+
+    def test_line_format_link_then_name_with_optional_logo(self):
+        text = ('# anotação\n'
+                '\n'
+                'https://a.example/a.m3u8;Canal A\n'
+                'Canal B;https://b.example/b.m3u8\n'
+                'https://c.example/c.m3u8;Canal C;https://logo.example/c.png\n'
+                'https://d.example/d.m3u8;Outro;$não é endereço\n'
+                'https://d.example/d.m3u8;Duplicado\n'
+                'https://e.example/e.m3u8\n')
+        channels = server._custom_parse(text, 'canais.txt')
+        self.assertEqual([c['name'] for c in channels], ['Canal A', 'Canal B', 'Canal C', 'Outro;$não é endereço'])
+        self.assertEqual(channels[0]['logo'], '')
+        self.assertEqual(channels[2]['logo'], 'https://logo.example/c.png')
+        self.assertEqual(channels[3]['url'], 'https://d.example/d.m3u8')
+
+    def test_endpoint_reads_file_and_filters_by_name(self):
+        with open(self.path, 'w', encoding='utf-8') as handle:
+            handle.write('https://a.example/a.m3u8;Canal A\n'
+                         'https://n.example/news.m3u8;Notícias 24h\n')
+        result = self.client.get('/api/custom/list').json
+        self.assertTrue(result['ok'])
+        self.assertEqual(result['total'], 2)
+        first = self.client.get('/api/custom/list?search=not%C3%ADcias').json
+        self.assertEqual(first['total'], 1)
+        self.assertEqual(first['channels'][0]['name'], 'Notícias 24h')
+
+    def test_reloads_the_file_without_restarting_the_server(self):
+        with open(self.path, 'w', encoding='utf-8') as handle:
+            handle.write('https://a.example/a.m3u8;Canal A\n')
+        result = self.client.get('/api/custom/list').json
+        self.assertEqual([c['name'] for c in result['channels']], ['Canal A'])
+        time.sleep(0.02)
+        with open(self.path, 'a', encoding='utf-8') as handle:
+            handle.write('https://c.example/c.m3u8;Canal C\n')
+        result = self.client.get('/api/custom/list').json
+        self.assertEqual(result['total'], 2)
+        self.assertEqual([c['name'] for c in result['channels']], ['Canal A', 'Canal C'])
 
 
 class ChatTests(unittest.TestCase):
